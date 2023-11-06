@@ -21,8 +21,7 @@ namespace SWTORCombatParser_Test
 
             TransferLogData(logName, testLogPath);
             //test that the log is parsed correctly
-            var log = CombatLogLoader.LoadSpecificLog(testLogPath);
-            if (log != null)
+            if (CombatLogLoader.LoadSpecificLog(testLogPath) != null)
                 Assert.Pass();
             else
                 Assert.Fail();
@@ -30,7 +29,7 @@ namespace SWTORCombatParser_Test
 
         private void TransferLogData(string logName, string testLogPath)
         {
-            var logLines = File.ReadAllLines(Path.Combine(_logPath, logName), new UTF7Encoding());
+            var logLines = File.ReadAllLines(Path.Combine(_logPath, logName), new UTF8Encoding());
             using (var fs = new FileStream(testLogPath, FileMode.Open, FileAccess.Write, FileShare.Read))
             {
                 var logIndex = 0;
@@ -39,7 +38,7 @@ namespace SWTORCombatParser_Test
                     var logsToMove = Math.Min(logLines.Length - logIndex, new Random().Next(1, 30));
                     for (var i = 0; i < logsToMove; i++)
                     {
-                        var stringBytes = new UTF7Encoding(true).GetBytes(logLines[logIndex + i] + '\n');
+                        var stringBytes = new UTF8Encoding().GetBytes(logLines[logIndex + i] + '\n');
                         fs.Write(stringBytes);
                         fs.Flush();
                     }

@@ -12,9 +12,9 @@ namespace SWTORCombatParser_Test
 {
     public class Test_AddBuiltinTimers
     {
-        private int _currentRev = 8;
+        private readonly int _currentRev = 8;
         [Test]
-        public void AddKetsumesTimers()
+        public void AddKeetsuneTimers()
         {
             var allTimers = JsonConvert.DeserializeObject<List<DefaultTimersData>>(
                 File.ReadAllText(Path.Combine(Environment.CurrentDirectory, @"keetsuneTimers.json")));
@@ -57,10 +57,37 @@ namespace SWTORCombatParser_Test
                 File.ReadAllText(Path.Combine(Environment.CurrentDirectory, @"keetsuneTimers.json")));
             var allIndividualTimers = allTimers.SelectMany(t => t.Timers);
             var enumerable = allIndividualTimers as Timer[] ?? allIndividualTimers.ToArray();
+            string[] missedSounds = // TODO
+            {
+                "ConeSwipe.mp3",
+                "Induction.mp3",
+                "Phase 2.mp3", // "Phase2.mp3" exists
+                "Phase 3.mp3", // "Phase3.mp3" exists
+                "Phase 4.mp3",
+                "Phase 5.mp3",
+                "Reposition.mp3",
+                "Interrupt.mp3",
+                "Explosion_.mp3", // "Explosion.mp3" exists
+            };
             enumerable.ForEach(t =>
             {
-                t.TimerSource = t.TimerSource.Count(t => t == '|') > 1 ? t.TimerSource.Split('|')[0] + "|" + t.TimerSource.Split('|')[1] : t.TimerSource;
+                t.TimerSource = t.TimerSource.Count(t => t == '|') > 1
+                    ? t.TimerSource.Split('|')[0] + "|" + t.TimerSource.Split('|')[1]
+                    : t.TimerSource;
                 t.IsUserAddedTimer = true;
+                t.CustomAudioPath = t.CustomAudioPath is not null &&
+                                    t.CustomAudioPath.Contains(@"C:\Users\kitsu\AppData\Local\StarParse\app\client\app\sounds")
+                    ? Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        t.CustomAudioPath.Replace(@"C:\Users\kitsu\AppData\Local\StarParse\app\client\app\sounds", @"resources\Audio\TimerAudio")
+                    )
+                    : t.CustomAudioPath;
+                if (t.CustomAudioPath is not null && !File.Exists(t.CustomAudioPath)
+                    && !missedSounds.Contains(t.CustomAudioPath.Split(new[] { @"\" }, StringSplitOptions.None).Last())
+                )
+                {
+                    Assert.Fail($"File {t.CustomAudioPath} do not exists");
+                }
             });
 
             var targetDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
