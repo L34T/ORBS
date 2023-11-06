@@ -1,6 +1,7 @@
 ﻿using SWTORCombatParser.DataStructures;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -94,7 +95,7 @@ namespace SWTORCombatParser.Model.Timers
                 Effect = string.IsNullOrEmpty(trigger.effectGuid) ? trigger.effect : trigger.effectGuid,
                 Ability = string.IsNullOrEmpty(trigger.abilityGuid) ? trigger.ability : trigger.abilityGuid,
                 TimerColor = string.IsNullOrEmpty(spTimer.color) ? Colors.Red : (Color)ColorConverter.ConvertFromString("#" + spTimer.color.Split('x')[1]),
-                DurationSec = string.IsNullOrEmpty(spTimer.interval) ? double.Parse(spTimer.countdownCount) : double.Parse(spTimer.interval),
+                DurationSec = string.IsNullOrEmpty(spTimer.interval) ? double.Parse(spTimer.countdownCount) : double.Parse(spTimer.interval, CultureInfo.InvariantCulture),
                 SpecificBoss = trigger.boss,
                 IsImportedFromSP = true,
                 TimerSource = "StarParse Import"

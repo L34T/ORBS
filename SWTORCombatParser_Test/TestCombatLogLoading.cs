@@ -1,3 +1,4 @@
+using System.IO;
 using NUnit.Framework;
 using SWTORCombatParser.Model.LogParsing;
 
@@ -5,16 +6,16 @@ namespace SWTORCombatParser_Test
 {
     public class TestCombatLogLoading
     {
-
         [Test]
         public void TestLoadCombatLogs()
         {
             var allCombatLogs = CombatLogLoader.LoadAllCombatLogs();
-            if (allCombatLogs.Length > 0 && allCombatLogs[0].Time > allCombatLogs[allCombatLogs.Length - 1].Time)
+            if (allCombatLogs.Length > 0 && allCombatLogs[0].Time > allCombatLogs[^1].Time)
                 Assert.Pass();
             else
                 Assert.Fail();
         }
+
         [Test]
         public void TestLoadMostRecentLog()
         {
@@ -25,14 +26,14 @@ namespace SWTORCombatParser_Test
             else
                 Assert.Fail();
         }
+
         [Test]
         public void TestLoadSpecifcLog()
         {
             var logName = "combat_2021-07-11_15_39_07_966187.txt";
-            var specificLog = CombatLogLoader.LoadSpecificLog(logName);
+            var specificLog = CombatLogLoader.LoadSpecificLog(Path.Combine(CombatLogLoader.LoggingPath, logName));
             if (specificLog != null)
                 Assert.Pass();
         }
-
     }
 }
