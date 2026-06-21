@@ -1,4 +1,4 @@
-﻿using Prism.Commands;
+using Prism.Commands;
 using SWTORCombatParser.DataStructures;
 using SWTORCombatParser.DataStructures.EncounterInfo;
 using SWTORCombatParser.Model.CloudRaiding;
@@ -33,6 +33,7 @@ namespace SWTORCombatParser.ViewModels.Combat_Monitoring
             }
         }
         public EncounterInfo EncounterInfo { get; set; }
+        public EncounterCombat ParentEncounter { get; set; }
         public Combat Combat { get; set; }
         public bool IsTrash => Combat != null && !Combat.IsCombatWithBoss && !IsCurrentCombat && !IsPvPCombat;
         public bool WasBossKilled => Combat?.WasBossKilled ?? false;

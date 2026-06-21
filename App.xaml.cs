@@ -1,4 +1,4 @@
-﻿using SWTORCombatParser.Model.CloudRaiding;
+using SWTORCombatParser.Model.CloudRaiding;
 using SWTORCombatParser.Utilities;
 using SWTORCombatParser.ViewModels;
 using SWTORCombatParser.Views;
@@ -7,11 +7,9 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
-using Orbs_Avalonia;
-using Avalonia;
-using SWTORCombatParser.ViewModels.Avalonia_TEMP;
+using System.Threading.Tasks;
+using SWTORCombatParser.ViewModels.Overlays.Timeline;
 
 namespace SWTORCombatParser
 {

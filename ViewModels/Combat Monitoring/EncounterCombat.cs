@@ -1,4 +1,4 @@
-﻿using SWTORCombatParser.DataStructures;
+using SWTORCombatParser.DataStructures;
 using SWTORCombatParser.DataStructures.EncounterInfo;
 using SWTORCombatParser.Model.CombatParsing;
 using SWTORCombatParser.Model.LogParsing;
@@ -77,6 +77,7 @@ namespace SWTORCombatParser.ViewModels.Combat_Monitoring
             //UnselectAll();
             var ongoingCombatDisplay = new PastCombat()
             {
+                ParentEncounter = this,
                 CombatStartTime = TimeUtility.CorrectedTime,
                 IsCurrentCombat = true,
                 IsSelected = true,
@@ -121,6 +122,7 @@ namespace SWTORCombatParser.ViewModels.Combat_Monitoring
                 Combats.Add(combat);
                 var pastCombatDisplay = new PastCombat()
                 {
+                    ParentEncounter = this,
                     IsSelected = isReplacingOngoing,
                     Combat = combat,
                     IsVisible = combatsAreVisible,
@@ -138,6 +140,8 @@ namespace SWTORCombatParser.ViewModels.Combat_Monitoring
                     OnPropertyChanged("EncounterCombats");
                 });
             }
+            if (isReplacingOngoing)
+                EncounterMonitor.FireEncounterUpdated();
             OnPropertyChanged("PPHInfo");
             OnPropertyChanged("NumberOfBossBattles");
             OnPropertyChanged("NumberOfTrashBattles");

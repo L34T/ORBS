@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -50,7 +50,14 @@ namespace SWTORCombatParser.Utilities
         public static void SetCurrentBrushDict()
         {
             var currentSettings = GetAllColors();
-            CurrentMetricBrushDict = currentSettings.ToDictionary(kvp=>Enum.Parse<OverlayType>(kvp.Key), kvp => new SolidColorBrush((Color)ColorConverter.ConvertFromString(kvp.Value)));
+            CurrentMetricBrushDict = new Dictionary<OverlayType, SolidColorBrush>();
+            foreach (var kvp in currentSettings)
+            {
+                if (Enum.TryParse<OverlayType>(kvp.Key, out var type))
+                {
+                    CurrentMetricBrushDict[type] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(kvp.Value));
+                }
+            }
         }
         public static void SetColorForMetric(OverlayType type, string color)
         {

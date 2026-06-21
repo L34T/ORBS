@@ -1,4 +1,4 @@
-﻿using SWTORCombatParser.Model.Overlays;
+using SWTORCombatParser.Model.Overlays;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -73,7 +73,11 @@ namespace SWTORCombatParser.Utilities.Converters
             {
                 return stringToOverlayType[oType];
             }
-            return Enum.Parse<OverlayType>(oType);
+            if (Enum.TryParse<OverlayType>(oType, out var result))
+            {
+                return result;
+            }
+            return OverlayType.None;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

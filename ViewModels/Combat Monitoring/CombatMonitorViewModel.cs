@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using SWTORCombatParser.DataStructures;
 using Prism.Commands;
 using SWTORCombatParser.DataStructures.ClassInfos;
@@ -454,6 +454,7 @@ namespace SWTORCombatParser.ViewModels.Combat_Monitoring
                 _allEncounters.Last().EncounterCombats.First().AdditiveSelectionToggle();
                 var combatSelected = _allEncounters.Last().EncounterCombats.First().Combat;
                 CombatIdentifier.CurrentCombat = _allEncounters.Last().EncounterCombats.First().Combat;
+                EncounterMonitor.FireEncounterUpdated();
                 //if (combatSelected.IsCombatWithBoss)
                 //{
                 //    Leaderboards.StartGetPlayerLeaderboardStandings(combatSelected);
@@ -477,6 +478,7 @@ namespace SWTORCombatParser.ViewModels.Combat_Monitoring
                 _allEncounters.Add(newEncounter);
                 _allEncounters.ForEach(e => e.Collapse());
                 CurrentEncounter = newEncounter;
+                EncounterMonitor.SetCurrentEncounter(CurrentEncounter);
                 return true;
             }
             return false;
@@ -531,6 +533,7 @@ namespace SWTORCombatParser.ViewModels.Combat_Monitoring
             //Run these in a task so that the UI can update first
             Task.Run(() =>
             {
+                EncounterMonitor.SetCurrentEncounter(selectedCombat.ParentEncounter);
                 CombatSelectionMonitor.SelectCompleteCombat(selectedCombat.Combat);
                 CombatSelectionMonitor.CheckForLeaderboardOnSelectedCombat(selectedCombat.Combat);
             });

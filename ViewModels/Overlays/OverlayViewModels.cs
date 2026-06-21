@@ -1,4 +1,4 @@
-﻿using SWTORCombatParser.DataStructures;
+using SWTORCombatParser.DataStructures;
 using SWTORCombatParser.DataStructures.ClassInfos;
 using SWTORCombatParser.Model.Challenge;
 using SWTORCombatParser.Model.CloudRaiding;
@@ -20,11 +20,10 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Data;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
-using SWTORCombatParser.ViewModels.Avalonia_TEMP;
+using SWTORCombatParser.ViewModels.Overlays.Timeline;
 
 namespace SWTORCombatParser.ViewModels.Overlays
 {
@@ -157,7 +156,7 @@ namespace SWTORCombatParser.ViewModels.Overlays
             DefaultChallengeManager.Init();
             
             //todo THIS WILL BE GONE once avalonia is embedded
-            AvaloniaTimelineBuilder.Init();
+            TimelineOverlayManager.Init();
             var enumVals = EnumUtil.GetValues<OverlayType>().OrderBy(d => d.ToString());
             foreach (var enumVal in enumVals.Where(e => e != OverlayType.None))
             {
@@ -217,7 +216,7 @@ namespace SWTORCombatParser.ViewModels.Overlays
             AvailableUtilityOverlays.First(v => v.Type == UtilityOverlayType.RaidBoss).IsSelected = _otherOverlayViewModel._bossFrameViewModel.BossFrameEnabled;
             AvailableUtilityOverlays.First(v => v.Type == UtilityOverlayType.RaidTimer).IsSelected = _otherOverlayViewModel._bossFrameViewModel.MechPredictionsEnabled;
             AvailableUtilityOverlays.First(v => v.Type == UtilityOverlayType.RoomHazard).IsSelected = _otherOverlayViewModel._roomOverlayViewModel.OverlayEnabled;
-            AvailableUtilityOverlays.First(v => v.Type == UtilityOverlayType.Timeline).IsSelected = AvaloniaTimelineBuilder.TimelineEnabled;
+            AvailableUtilityOverlays.First(v => v.Type == UtilityOverlayType.Timeline).IsSelected = TimelineOverlayManager.TimelineEnabled;
             AvailableUtilityOverlays.First(v => v.Type == UtilityOverlayType.PvPHP).IsSelected = _otherOverlayViewModel._PvpOverlaysConfigViewModel.OpponentHPEnabled;
             AvailableUtilityOverlays.First(v => v.Type == UtilityOverlayType.PvPMap).IsSelected = _otherOverlayViewModel._PvpOverlaysConfigViewModel.MiniMapEnabled;
             AvailableUtilityOverlays.First(v => v.Type == UtilityOverlayType.AbilityList).IsSelected = _abilityListSetup.AbilityListEnabled;
@@ -284,7 +283,14 @@ namespace SWTORCombatParser.ViewModels.Overlays
         }
         private void SetOverlaysToRole()
         {
-            SetPersonalByClass(Enum.Parse<Role>(_currentCharacterRole));
+            if (Enum.TryParse<Role>(_currentCharacterRole, out var role))
+            {
+                SetPersonalByClass(role);
+            }
+            else
+            {
+                SetPersonalByClass(Role.DPS);
+            }
             _overlayDefaults = DefaultCharacterOverlays.GetCharacterDefaults(_currentCharacterRole);
 
             UpdateOverlays();
@@ -417,7 +423,7 @@ namespace SWTORCombatParser.ViewModels.Overlays
                     _raidNotesSetup.RaidNotesEnabled = !_raidNotesSetup.RaidNotesEnabled;
                     break;
                 case UtilityOverlayType.Timeline:
-                    AvaloniaTimelineBuilder.TimelineEnabled = !AvaloniaTimelineBuilder.TimelineEnabled;
+                    TimelineOverlayManager.TimelineEnabled = !TimelineOverlayManager.TimelineEnabled;
                     break;
                 default:
                     return;
@@ -498,11 +504,11 @@ namespace SWTORCombatParser.ViewModels.Overlays
                 OverlayLockStateChanged();
                 if (value)
                 {
-                    AvaloniaTimelineBuilder.LockOverlay();
+                    TimelineOverlayManager.LockOverlay();
                 }         
                 else
                 {
-                    AvaloniaTimelineBuilder.UnlockOverlay();
+                    TimelineOverlayManager.UnlockOverlay();
                 }
                 OnPropertyChanged();
             }
