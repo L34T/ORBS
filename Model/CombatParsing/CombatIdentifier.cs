@@ -1,4 +1,4 @@
-﻿using SWTORCombatParser.DataStructures;
+using SWTORCombatParser.DataStructures;
 using SWTORCombatParser.DataStructures.EncounterInfo;
 using SWTORCombatParser.Model.LogParsing;
 using SWTORCombatParser.ViewModels.Timers;
@@ -85,8 +85,8 @@ namespace SWTORCombatParser.Model.CombatParsing
             {
                 CombatMetaDataParse.PopulateMetaData(newCombat);
                 var absorbLogs = newCombat.IncomingDamageMitigatedLogs.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.AsParallel().WithDegreeOfParallelism(8).Where(l => l.Value.Modifier.ValueType == DamageType.absorbed).OrderBy(l => l.TimeStamp).ToList());
-                AddSheildingToLogs.AddShieldLogsByTarget(absorbLogs, newCombat);
-                AddTankCooldown.AddDamageSavedDuringCooldown(newCombat);
+                ShieldingProcessor.AddShieldLogsByTarget(absorbLogs, newCombat);
+                TankCooldownProcessor.AddDamageSavedDuringCooldown(newCombat);
             }
             if(combatEndUpdate)
             {

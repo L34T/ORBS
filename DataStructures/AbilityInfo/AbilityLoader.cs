@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.IO;
 
@@ -10,9 +10,8 @@ namespace SWTORCombatParser.DataStructures.AbilityInfo
     }
     public static class AbilityLoader
     {
-        public static Dictionary<double, AbilityInfo> GetAbosrbAbilities()
-        {
-            return JsonConvert.DeserializeObject<Dictionary<double, AbilityInfo>>(File.ReadAllText(@"DataStructures/AbilityInfo/absorbs.json"));
-        }
+        public static Dictionary<double, AbilityInfo> AbsorbAbilities { get; set; } = 
+            JsonConvert.DeserializeObject<Dictionary<double, AbilityInfo>>(File.ReadAllText(@"DataStructures/AbilityInfo/absorbs.json"));
+        public static void SetAbsorbAbilities() { }
     }
 }

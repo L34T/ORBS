@@ -39,9 +39,14 @@ namespace SWTORCombatParser.Utilities.Converters
         { OverlayType.CritPercent,"Crit %"},
             {OverlayType.SingleTargetDPS,"Single Target DPS" },
             {OverlayType.SingleTargetEHPS, "Single Target EHPS" },
-            {OverlayType.CleanseCount, "Cleanse Count" },
-            {OverlayType.CleanseSpeed, "Cleanse Speed" }
-};
+            { OverlayType.CleanseCount, "Cleanse Count" },
+            { OverlayType.CleanseSpeed, "Cleanse Speed" },
+            { OverlayType.InstantaneousDPS, "Instantaneous DPS" },
+            { OverlayType.InstantaneousEHPS, "Instantaneous EHPS" },
+            { OverlayType.InstantaneousDPTS, "Instantaneous DPTS" },
+            { OverlayType.FluffDPS, "Fluff DPS" },
+            { OverlayType.EHPSNoShielding, "EHPS (No Shielding)" }
+        };
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             if (value.GetType() == typeof(List<OverlayType>))

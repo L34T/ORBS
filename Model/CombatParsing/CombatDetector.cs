@@ -1,4 +1,4 @@
-﻿using SWTORCombatParser.DataStructures;
+using SWTORCombatParser.DataStructures;
 using SWTORCombatParser.DataStructures.EncounterInfo;
 using SWTORCombatParser.Model.LogParsing;
 using SWTORCombatParser.Utilities;
@@ -75,7 +75,7 @@ namespace SWTORCombatParser.Model.CombatParsing
             }
             if (line.Effect.EffectId == _7_0LogParsing.EnterCombatId)
             {
-                if (!_justRevived)
+                if (!_justRevived || (_currentEncounter != null && _currentEncounter.IsOpenWorld))
                 {
                     if (InCombat)
                     {

@@ -1,4 +1,4 @@
-﻿using SWTORCombatParser.DataStructures.ClassInfos;
+using SWTORCombatParser.DataStructures.ClassInfos;
 using SWTORCombatParser.DataStructures.EncounterInfo;
 using SWTORCombatParser.Model.CombatParsing;
 using SWTORCombatParser.Model.LogParsing;
@@ -16,6 +16,7 @@ namespace SWTORCombatParser.DataStructures
 {
     public class Combat
     {
+        public Entity Initiator { get; set; }
         public Entity LocalPlayer => CharacterParticipants.FirstOrDefault(p => p.IsLocalPlayer);
         public List<Entity> CharacterParticipants = new List<Entity>();
         public Dictionary<Entity, SWTORClass> CharacterClases = new Dictionary<Entity, SWTORClass>();
@@ -79,7 +80,7 @@ namespace SWTORCombatParser.DataStructures
                 return false;
             }
         }
-        public HashSet<ParsedLogEntry> AllLogs { get; set; } = new HashSet<ParsedLogEntry>();
+        public CombatLogsCollection AllLogs { get; set; } = new CombatLogsCollection();
         public Dictionary<Entity, List<ParsedLogEntry>> LogsInvolvingEntity = new Dictionary<Entity, List<ParsedLogEntry>>();
 
         public List<ParsedLogEntry> GetLogsInvolvingEntity(Entity e)
@@ -102,6 +103,7 @@ namespace SWTORCombatParser.DataStructures
         public ConcurrentDictionary<Entity, List<ParsedLogEntry>> IncomingHealingLogs = new ConcurrentDictionary<Entity, List<ParsedLogEntry>>();
         public ConcurrentDictionary<Entity, List<ParsedLogEntry>> ShieldingProvidedLogs = new ConcurrentDictionary<Entity, List<ParsedLogEntry>>();
         public ConcurrentDictionary<Entity, List<ParsedLogEntry>> AbilitiesActivated = new ConcurrentDictionary<Entity, List<ParsedLogEntry>>();
+        public ConcurrentDictionary<Entity, Dictionary<Entity, double>> PlayerThreatPerEnemy = new ConcurrentDictionary<Entity, Dictionary<Entity, double>>();
         public List<Point> GetBurstValues(Entity entity, PlotType typeOfData)
         {
             var logs = new List<ParsedLogEntry>();
@@ -497,6 +499,55 @@ namespace SWTORCombatParser.DataStructures
         public Dictionary<Entity, double> APM => DurationSeconds == 0 ? TotalAbilites.ToDictionary(kvp => kvp.Key, kvp => 0d) : TotalAbilites.ToDictionary(kvp => kvp.Key, kvp => kvp.Value / (DurationSeconds / 60d));
         public Dictionary<Entity, double> HPS => DurationSeconds == 0 ? TotalHealing.ToDictionary(kvp => kvp.Key, kvp => 0d) : TotalHealing.ToDictionary(kvp => kvp.Key, kvp => kvp.Value / DurationSeconds);
         public Dictionary<Entity, double> EHPS => DurationSeconds == 0 ? TotalEffectiveHealing.ToDictionary(kvp => kvp.Key, kvp => 0d) : TotalEffectiveHealing.ToDictionary(kvp => kvp.Key, kvp => kvp.Value / DurationSeconds);
+        public Dictionary<Entity, double> InstantaneousEffectiveDPS
+        {
+            get
+            {
+                double windowSeconds = 10.0;
+                var startTime = EndTime.AddSeconds(-windowSeconds);
+
+                return OutgoingDamageLogs.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp =>
+                    {
+                        var snapshot = kvp.Value.ToArray();
+                        if (snapshot.Length == 0) return 0d;
+
+                        var total = snapshot
+                            .Reverse()
+                            .TakeWhile(e => e.TimeStamp >= startTime)
+                            .Sum(e => e.Value.EffectiveDblValue);
+
+                        return total / windowSeconds;
+                    }
+                );
+            }
+        }
+        public Dictionary<Entity, double> InstantaneousEffectiveHPS
+        {
+            get
+            {
+                double windowSeconds = 10.0;
+                var startTime = EndTime.AddSeconds(-windowSeconds);
+
+                return OutgoingHealingLogs.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp =>
+                    {
+                        var entity = kvp.Key;
+                        var heals   = kvp.Value.ToArray().Reverse();
+                        var shields = ShieldingProvidedLogs.TryGetValue(entity, out var q)
+                            ? q.ToArray().Reverse()
+                            : Enumerable.Empty<ParsedLogEntry>();
+
+                        var sumHeal   = heals.TakeWhile(e => e.TimeStamp >= startTime).Sum(e => e.Value.EffectiveDblValue);
+                        var sumShield = shields.TakeWhile(e => e.TimeStamp >= startTime).Sum(e => e.Value.EffectiveDblValue);
+
+                        return (sumHeal + sumShield) / windowSeconds;
+                    }
+                );
+            }
+        }
         public Dictionary<Entity, double> STEHPS => DurationSeconds == 0 ? MaxSingleTargetHealing.ToDictionary(kvp => kvp.Key, kvp => 0d) : MaxSingleTargetHealing.ToDictionary(kvp => kvp.Key, kvp => kvp.Value / DurationSeconds);
         public Dictionary<Entity, double> CompEHPS => DurationSeconds == 0 ? TotalEffectiveCompanionHealing.ToDictionary(kvp => kvp.Key, kvp => 0d) : TotalEffectiveCompanionHealing.ToDictionary(kvp => kvp.Key, kvp => kvp.Value / DurationSeconds);
         public Dictionary<Entity, double> SPS => DurationSeconds == 0 ? TotalTankSheilding.ToDictionary(kvp => kvp.Key, kvp => 0d) : TotalTankSheilding.ToDictionary(kvp => kvp.Key, kvp => kvp.Value / DurationSeconds);
@@ -542,6 +593,72 @@ namespace SWTORCombatParser.DataStructures
             if (tempDuration < phaseCombat.DurationMS)
                 phaseCombat.DurationOverride = tempDuration;
             return phaseCombat;
+        }
+    }
+
+    public class CombatLogsCollection : IEnumerable<ParsedLogEntry>
+    {
+        private readonly ConcurrentDictionary<long, ParsedLogEntry> _dict = new();
+
+        public CombatLogsCollection() { }
+
+        public CombatLogsCollection(IEnumerable<ParsedLogEntry> items)
+        {
+            foreach (var item in items)
+            {
+                _dict[item.LogLineNumber] = item;
+            }
+        }
+
+        public static implicit operator CombatLogsCollection(HashSet<ParsedLogEntry> set)
+        {
+            return new CombatLogsCollection(set);
+        }
+
+        public static implicit operator CombatLogsCollection(List<ParsedLogEntry> list)
+        {
+            return new CombatLogsCollection(list);
+        }
+
+        public static implicit operator HashSet<ParsedLogEntry>(CombatLogsCollection collection)
+        {
+            return new HashSet<ParsedLogEntry>(collection._dict.Values);
+        }
+
+        public int Count => _dict.Count;
+
+        public ParsedLogEntry this[long logLineNumber]
+        {
+            get => _dict.TryGetValue(logLineNumber, out var value) ? value : null;
+            set => _dict[logLineNumber] = value;
+        }
+
+        public ICollection<long> Keys => _dict.Keys;
+        public ICollection<ParsedLogEntry> Values => _dict.Values;
+
+        public void Add(ParsedLogEntry item)
+        {
+            _dict[item.LogLineNumber] = item;
+        }
+
+        public void Clear()
+        {
+            _dict.Clear();
+        }
+
+        public bool Contains(ParsedLogEntry item)
+        {
+            return _dict.ContainsKey(item.LogLineNumber);
+        }
+
+        public IEnumerator<ParsedLogEntry> GetEnumerator()
+        {
+            return _dict.Values.GetEnumerator();
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
         }
     }
 }
