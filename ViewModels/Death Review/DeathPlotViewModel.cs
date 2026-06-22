@@ -1,4 +1,4 @@
-﻿using ScottPlot;
+using ScottPlot;
 using ScottPlot.Plottable;
 using SWTORCombatParser.DataStructures;
 using SWTORCombatParser.Model.LogParsing;
@@ -186,22 +186,22 @@ namespace SWTORCombatParser.ViewModels.Death_Review
             _crossHair.IsVisible = true;
             _crossHair.HorizontalLine.IsVisible = false;
         }
-        private List<ParsedLogEntry> GetCorrectData(PlotType type, Combat combatToPlot, Entity selectedParticipant)
+        private IReadOnlyList<ParsedLogEntry> GetCorrectData(PlotType type, Combat combatToPlot, Entity selectedParticipant)
         {
             switch (type)
             {
                 case PlotType.DamageOutput:
-                    return combatToPlot.OutgoingDamageLogs[selectedParticipant];
+                    return combatToPlot.OutgoingDamageLogs.TryGetValue(selectedParticipant, out var l1) ? l1 : new List<ParsedLogEntry>();
                 case PlotType.DamageTaken:
-                    return combatToPlot.IncomingDamageLogs[selectedParticipant];
+                    return combatToPlot.IncomingDamageLogs.TryGetValue(selectedParticipant, out var l2) ? l2 : new List<ParsedLogEntry>();
                 case PlotType.HealingOutput:
-                    return combatToPlot.OutgoingHealingLogs[selectedParticipant];
+                    return combatToPlot.OutgoingHealingLogs.TryGetValue(selectedParticipant, out var l3) ? l3 : new List<ParsedLogEntry>();
                 case PlotType.HealingTaken:
-                    return combatToPlot.IncomingHealingLogs[selectedParticipant];
+                    return combatToPlot.IncomingHealingLogs.TryGetValue(selectedParticipant, out var l4) ? l4 : new List<ParsedLogEntry>();
                 case PlotType.SheildedDamageTaken:
-                    return combatToPlot.ShieldingProvidedLogs[selectedParticipant];
+                    return combatToPlot.ShieldingProvidedLogs.TryGetValue(selectedParticipant, out var l5) ? l5 : new List<ParsedLogEntry>();
                 case PlotType.HPPercent:
-                    return combatToPlot.GetLogsInvolvingEntity(selectedParticipant).ToList();
+                    return combatToPlot.GetLogsInvolvingEntity(selectedParticipant);
 
             }
             return null;

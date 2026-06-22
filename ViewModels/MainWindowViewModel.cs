@@ -1,4 +1,4 @@
-﻿using Prism.Commands;
+using Prism.Commands;
 using SWTORCombatParser.DataStructures;
 using SWTORCombatParser.DataStructures.EncounterInfo;
 using SWTORCombatParser.DataStructures.Hotkeys;
@@ -201,7 +201,7 @@ namespace SWTORCombatParser.ViewModels
             }
             list.ForEach(p => p.PhaseEnd = p.PhaseEnd == DateTime.MinValue ? UnfilteredDisplayedCombat.EndTime : p.PhaseEnd);
             var logsDuringPhases = UnfilteredDisplayedCombat.AllLogs.Where(l => list.Any(p => p.ContainsTime(l.TimeStamp))).ToList();
-            var newCombat = CombatIdentifier.GenerateNewCombatFromLogs(logsDuringPhases);
+            var newCombat = CombatIdentifier.GenerateCombatSnapshotFromLogs(logsDuringPhases, isRealtime: false, combatEndUpdate: true);
             CombatSelectionMonitor.SelectPhase(newCombat);
             UpdateViewsWithSelectedCombat(newCombat);
         }

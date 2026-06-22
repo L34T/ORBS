@@ -1,4 +1,4 @@
-﻿using MathNet.Numerics.Statistics;
+using MathNet.Numerics.Statistics;
 using SWTORCombatParser.DataStructures;
 using SWTORCombatParser.DataStructures.ClassInfos;
 using SWTORCombatParser.Model.LogParsing;
@@ -31,23 +31,23 @@ l.Effect.EffectType == EffectType.Remove && l.Target.LogId != l.Source.LogId && 
                 var incomingLogs = logsInScope.Where(log => log.Target == entity);
 
                 var parsedLogEntries = outgoingLogs as ParsedLogEntry[] ?? outgoingLogs.ToArray();
-                combat.OutgoingDamageLogs[entity] = parsedLogEntries
-                    .Where(l => l.Effect.EffectType == EffectType.Apply && l.Effect.EffectId == _7_0LogParsing._damageEffectId && (l.Source.Name != l.Target.Name)).ToList();
-                combat.OutgoingHealingLogs[entity] = parsedLogEntries
-                    .Where(l => l.Effect.EffectType == EffectType.Apply && l.Effect.EffectId == _7_0LogParsing._healEffectId).ToList();
-                combat.AbilitiesActivated[entity] = parsedLogEntries.Where(l =>
-                    l.Effect.EffectType == EffectType.Event && l.Effect.EffectId == _7_0LogParsing.AbilityActivateId).ToList();
+                combat.OutgoingDamageLogs[entity] = new CombatLogsList<ParsedLogEntry>(parsedLogEntries
+                    .Where(l => l.Effect.EffectType == EffectType.Apply && l.Effect.EffectId == _7_0LogParsing._damageEffectId && (l.Source.Name != l.Target.Name)));
+                combat.OutgoingHealingLogs[entity] = new CombatLogsList<ParsedLogEntry>(parsedLogEntries
+                    .Where(l => l.Effect.EffectType == EffectType.Apply && l.Effect.EffectId == _7_0LogParsing._healEffectId));
+                combat.AbilitiesActivated[entity] = new CombatLogsList<ParsedLogEntry>(parsedLogEntries.Where(l =>
+                    l.Effect.EffectType == EffectType.Event && l.Effect.EffectId == _7_0LogParsing.AbilityActivateId));
                 var logEntries = incomingLogs as ParsedLogEntry[] ?? incomingLogs.ToArray();
-                combat.IncomingDamageLogs[entity] = logEntries
-                    .Where(l => l.Effect.EffectType == EffectType.Apply && l.Effect.EffectId == _7_0LogParsing._damageEffectId).ToList();
-                combat.IncomingHealingLogs[entity] = logEntries
-                    .Where(l => l.Effect.EffectType == EffectType.Apply && l.Effect.EffectId == _7_0LogParsing._healEffectId).ToList();
+                combat.IncomingDamageLogs[entity] = new CombatLogsList<ParsedLogEntry>(logEntries
+                    .Where(l => l.Effect.EffectType == EffectType.Apply && l.Effect.EffectId == _7_0LogParsing._damageEffectId));
+                combat.IncomingHealingLogs[entity] = new CombatLogsList<ParsedLogEntry>(logEntries
+                    .Where(l => l.Effect.EffectType == EffectType.Apply && l.Effect.EffectId == _7_0LogParsing._healEffectId));
 
                 var bigDamageTimestamps = GetTimestampOfBigHits(combat.IncomingDamageLogs[entity]);
                 combat.BigDamageTimestamps[entity] = bigDamageTimestamps;
 
-                combat.IncomingDamageMitigatedLogs[entity] =
-                    combat.IncomingDamageLogs[entity].Where(l => l.Value.Modifier != null).ToList();
+                combat.IncomingDamageMitigatedLogs[entity] = new CombatLogsList<ParsedLogEntry>(
+                    combat.IncomingDamageLogs[entity].Where(l => l.Value.Modifier != null));
 
                 var totalHealing = combat.OutgoingHealingLogs[entity].Sum(l => l.Value.DblValue);
                 var totalEffectiveHealing = combat.OutgoingHealingLogs[entity].Sum(l => l.Value.EffectiveDblValue);
@@ -162,9 +162,283 @@ l.Effect.EffectType == EffectType.Remove && l.Target.LogId != l.Source.LogId && 
             }
         }
 
+        public static void ApplyIncrementalMetaData(Combat combat, IEnumerable<ParsedLogEntry> newLogs, bool combatEndUpdate = false)
+        {
+            var outgoingDamageNew = new Dictionary<Entity, List<ParsedLogEntry>>();
+            var outgoingHealingNew = new Dictionary<Entity, List<ParsedLogEntry>>();
+            var incomingDamageNew = new Dictionary<Entity, List<ParsedLogEntry>>();
+            var incomingHealingNew = new Dictionary<Entity, List<ParsedLogEntry>>();
+            var shieldingProvidedNew = new Dictionary<Entity, List<ParsedLogEntry>>();
+            var mitigatedDamageNew = new Dictionary<Entity, List<ParsedLogEntry>>();
+            var abilitiesActivatedNew = new Dictionary<Entity, List<ParsedLogEntry>>();
+            var logsInvolvingEntityNew = new Dictionary<long, List<ParsedLogEntry>>();
+
+            void EnsureList<K, V>(Dictionary<K, List<V>> dict, K key, V val) where K : notnull
+            {
+                if (!dict.TryGetValue(key, out var list))
+                {
+                    list = new List<V>();
+                    dict[key] = list;
+                }
+                list.Add(val);
+            }
+
+            void EnsureCombatList(System.Collections.Concurrent.ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>> dict, Entity e)
+            {
+                if (!dict.ContainsKey(e))
+                {
+                    dict[e] = new CombatLogsList<ParsedLogEntry>();
+                }
+            }
+
+            void EnsureLogsInvolving(Combat c, Entity e)
+            {
+                if (c.CharacterParticipants.All(p => p.LogId != e.LogId) && c.Targets.All(t => t.LogId != e.LogId))
+                {
+                    if (e.IsCharacter || e.IsCompanion)
+                        c.CharacterParticipants.Add(e);
+                    else
+                        c.Targets.Add(e);
+                }
+                if (!c.LogsInvolvingEntity.ContainsKey(e.LogId))
+                {
+                    c.LogsInvolvingEntity[e.LogId] = new CombatLogsList<ParsedLogEntry>();
+                }
+            }
+
+            var bossIds = new HashSet<long>();
+            if (combat.ParentEncounter?.BossIds != null)
+            {
+                foreach (var diffMap in combat.ParentEncounter.BossIds.Values)
+                foreach (var list in diffMap.Values)
+                foreach (var id in list)
+                    bossIds.Add(id);
+            }
+
+            foreach (var log in newLogs)
+            {
+                var src = log.Source;
+                var tgt = log.Target;
+                var et = log.Effect.EffectType;
+                var eid = log.Effect.EffectId;
+                var val = log.Value;
+
+                if (src != null)
+                {
+                    EnsureCombatList(combat.OutgoingDamageLogs, src);
+                    EnsureCombatList(combat.OutgoingHealingLogs, src);
+                    EnsureCombatList(combat.AbilitiesActivated, src);
+                    EnsureLogsInvolving(combat, src);
+                    EnsureList(logsInvolvingEntityNew, src.LogId, log);
+                }
+                if (tgt != null)
+                {
+                    EnsureCombatList(combat.IncomingDamageLogs, tgt);
+                    EnsureCombatList(combat.IncomingHealingLogs, tgt);
+                    EnsureCombatList(combat.IncomingDamageMitigatedLogs, tgt);
+                    EnsureCombatList(combat.ShieldingProvidedLogs, tgt);
+                    EnsureLogsInvolving(combat, tgt);
+                    if (src == null || src.LogId != tgt.LogId)
+                    {
+                        EnsureList(logsInvolvingEntityNew, tgt.LogId, log);
+                    }
+                }
+
+                // 1) Threat
+                var thr = log.Threat;
+                if (thr > 0 && tgt != null && !tgt.IsCharacter && src != null)
+                {
+                    if (!combat.PlayerThreatPerEnemy.TryGetValue(tgt, out var threatDict))
+                    {
+                        threatDict = new Dictionary<Entity, double>();
+                        combat.PlayerThreatPerEnemy[tgt] = threatDict;
+                    }
+                    lock (threatDict)
+                    {
+                        threatDict[src] = threatDict.TryGetValue(src, out var currentThreat) ? currentThreat + thr : thr;
+                    }
+                    combat.TotalThreat.AddOrUpdate(src, thr, (k, existing) => existing + thr);
+                }
+
+                // 2) Outgoing Damage
+                if (et == EffectType.Apply && eid == _7_0LogParsing._damageEffectId && src != null && tgt != null && src.Name != tgt.Name)
+                {
+                    EnsureList(outgoingDamageNew, src, log);
+
+                    double dmg = val.DblValue;
+                    double edmg = val.EffectiveDblValue;
+                    bool isBoss = bossIds.Contains(tgt.LogId);
+
+                    combat.TotalFluffDamage.AddOrUpdate(src, isBoss ? 0 : dmg, (k, existing) => existing + (isBoss ? 0 : dmg));
+                    combat.TotalEffectiveFluffDamage.AddOrUpdate(src, isBoss ? 0 : edmg, (k, existing) => existing + (isBoss ? 0 : edmg));
+                    combat.TotalFocusDamage.AddOrUpdate(src, isBoss ? dmg : 0, (k, existing) => existing + (isBoss ? dmg : 0));
+                    combat.TotalEffectiveFocusDamage.AddOrUpdate(src, isBoss ? edmg : 0, (k, existing) => existing + (isBoss ? edmg : 0));
+                }
+
+                // 3) Incoming Damage / Mitigated / Shield
+                if (et == EffectType.Apply && eid == _7_0LogParsing._damageEffectId && tgt != null)
+                {
+                    EnsureList(incomingDamageNew, tgt, log);
+
+                    double taken = val.DblValue;
+                    double mitigated = val.MitigatedDblValue;
+
+                    combat.TotalDamageTaken.AddOrUpdate(tgt, taken, (k, existing) => existing + taken);
+                    combat.TotalEffectiveDamageTaken.AddOrUpdate(tgt, val.EffectiveDblValue, (k, existing) => existing + val.EffectiveDblValue);
+
+                    if (val.Modifier != null)
+                    {
+                        EnsureList(mitigatedDamageNew, tgt, log);
+                        combat.TotalSheildAndAbsorb.AddOrUpdate(tgt, val.Modifier.EffectiveDblValue, (k, existing) => existing + val.Modifier.EffectiveDblValue);
+
+                        if (val.Modifier.ValueType == DamageType.shield)
+                        {
+                            EnsureList(shieldingProvidedNew, tgt, log);
+                            combat.TotalTankSheilding.AddOrUpdate(tgt, val.Modifier.DblValue, (k, existing) => existing + val.Modifier.DblValue);
+                        }
+                    }
+                }
+
+                // 4) Outgoing Healing
+                if (et == EffectType.Apply && eid == _7_0LogParsing._healEffectId && src != null)
+                {
+                    EnsureList(outgoingHealingNew, src, log);
+                    double heal = val.DblValue;
+                    double eheal = val.EffectiveDblValue;
+                    combat.TotalHealing.AddOrUpdate(src, heal, (k, existing) => existing + heal);
+                    combat.TotalEffectiveHealing.AddOrUpdate(src, eheal, (k, existing) => existing + eheal);
+                }
+
+                // 5) Incoming Healing
+                if (et == EffectType.Apply && eid == _7_0LogParsing._healEffectId && tgt != null)
+                {
+                    EnsureList(incomingHealingNew, tgt, log);
+                    double rec = val.DblValue;
+                    double erec = val.EffectiveDblValue;
+                    combat.TotalHealingReceived.AddOrUpdate(tgt, rec, (k, existing) => existing + rec);
+                    combat.TotalEffectiveHealingReceived.AddOrUpdate(tgt, erec, (k, existing) => existing + erec);
+                }
+
+                // 6) Ability Activation
+                if (et == EffectType.Event && eid == _7_0LogParsing.AbilityActivateId && src != null)
+                {
+                    EnsureList(abilitiesActivatedNew, src, log);
+                    combat.TotalAbilites.AddOrUpdate(src, 1, (k, existing) => existing + 1);
+                }
+
+                // 7) Interrupts
+                if (et == EffectType.Event && eid == _7_0LogParsing.InterruptCombatId && src != null)
+                {
+                    combat.TotalInterrupts.AddOrUpdate(src, 1, (k, existing) => existing + 1);
+                }
+
+                // 8) Cleanses
+                if (et == EffectType.Event && _cleanseAbilityIds.Contains(log.AbilityId) && src != null)
+                {
+                    combat.TotalCleanses.AddOrUpdate(src, 1, (k, existing) => existing + 1);
+                }
+            }
+
+            // Bulk apply additions to lists
+            foreach (var kvp in logsInvolvingEntityNew)
+                combat.LogsInvolvingEntity[kvp.Key].AddRange(kvp.Value);
+            foreach (var kvp in outgoingDamageNew)
+                combat.OutgoingDamageLogs[kvp.Key].AddRange(kvp.Value);
+            foreach (var kvp in incomingDamageNew)
+                combat.IncomingDamageLogs[kvp.Key].AddRange(kvp.Value);
+            foreach (var kvp in mitigatedDamageNew)
+                combat.IncomingDamageMitigatedLogs[kvp.Key].AddRange(kvp.Value);
+            foreach (var kvp in outgoingHealingNew)
+                combat.OutgoingHealingLogs[kvp.Key].AddRange(kvp.Value);
+            foreach (var kvp in incomingHealingNew)
+                combat.IncomingHealingLogs[kvp.Key].AddRange(kvp.Value);
+            foreach (var kvp in shieldingProvidedNew)
+                combat.ShieldingProvidedLogs[kvp.Key].AddRange(kvp.Value);
+            foreach (var kvp in abilitiesActivatedNew)
+                combat.AbilitiesActivated[kvp.Key].AddRange(kvp.Value);
+
+            // Recompute max damage/healing and metadata metrics
+            foreach (var kvp in outgoingDamageNew)
+            {
+                var ent = kvp.Key;
+                var maxD = kvp.Value.Max(l => l.Value.DblValue);
+                var maxED = kvp.Value.Max(l => l.Value.EffectiveDblValue);
+                combat.MaxDamage.AddOrUpdate(ent, maxD, (k, existing) => Math.Max(existing, maxD));
+                combat.MaxEffectiveDamage.AddOrUpdate(ent, maxED, (k, existing) => Math.Max(existing, maxED));
+            }
+
+            foreach (var kvp in incomingDamageNew)
+            {
+                var ent = kvp.Key;
+                var maxD = kvp.Value.Max(l => l.Value.DblValue);
+                var maxED = kvp.Value.Max(l => l.Value.MitigatedDblValue);
+                combat.MaxIncomingDamage.AddOrUpdate(ent, maxD, (k, existing) => Math.Max(existing, maxD));
+                combat.MaxEffectiveIncomingDamage.AddOrUpdate(ent, maxED, (k, existing) => Math.Max(existing, maxED));
+
+                // big hits & avoided damage
+                var bigs = GetTimestampOfBigHits(kvp.Value);
+                if (bigs.Count > 0)
+                {
+                    if (!combat.BigDamageTimestamps.ContainsKey(ent))
+                        combat.BigDamageTimestamps[ent] = new List<DateTime>();
+                    lock (combat.BigDamageTimestamps[ent])
+                    {
+                        combat.BigDamageTimestamps[ent].AddRange(bigs);
+                    }
+                }
+
+                var parriedSums = CalculateEstimatedAvoidedDamage(combat, ent);
+                var newEstimated = parriedSums.Sum(p => p.Value);
+                var prevEstimated = combat.TotalEstimatedAvoidedDamage.TryGetValue(ent, out var prev) ? prev : 0;
+                var diff = newEstimated - prevEstimated;
+                if (diff != 0)
+                {
+                    combat.TotalEstimatedAvoidedDamage[ent] = newEstimated;
+                    combat.TotalDamageTaken.AddOrUpdate(ent, diff, (k, existing) => existing + diff);
+                }
+            }
+
+            foreach (var kvp in outgoingHealingNew)
+            {
+                var ent = kvp.Key;
+                var maxH = kvp.Value.Max(l => l.Value.DblValue);
+                var maxEH = kvp.Value.Max(l => l.Value.EffectiveDblValue);
+                combat.MaxHeal.AddOrUpdate(ent, maxH, (k, existing) => Math.Max(existing, maxH));
+                combat.MaxEffectiveHeal.AddOrUpdate(ent, maxEH, (k, existing) => Math.Max(existing, maxEH));
+            }
+
+            foreach (var kvp in incomingHealingNew)
+            {
+                var ent = kvp.Key;
+                var maxH = kvp.Value.Max(l => l.Value.DblValue);
+                var maxEH = kvp.Value.Max(l => l.Value.EffectiveDblValue);
+                combat.MaxIncomingHeal.AddOrUpdate(ent, maxH, (k, existing) => Math.Max(existing, maxH));
+                combat.MaxIncomingEffectiveHeal.AddOrUpdate(ent, maxEH, (k, existing) => Math.Max(existing, maxEH));
+            }
+
+            if (combatEndUpdate)
+            {
+                if (!combat.HasBurstValues())
+                    combat.SetBurstValues();
+
+                var healers = combat.CharacterParticipants.Where(p => CombatLogStateBuilder.CurrentState.GetCharacterClassAtTime(p, combat.EndTime).Role == Role.Healer).ToList();
+                var tanks = combat.CharacterParticipants.Where(p => CombatLogStateBuilder.CurrentState.GetCharacterClassAtTime(p, combat.EndTime).Role == Role.Tank).ToList();
+
+                foreach (var healer in healers)
+                {
+                    var abilityActivateTimesOnTargets = GetTimestampsOfAbilitiesOnPlayers(combat.AbilitiesActivated[healer]);
+                    var reactionTimesToBigHigs = CalculateReactionToBigHits(combat.BigDamageTimestamps.ToDictionary(kvp => kvp.Key, kvp => kvp.Value), abilityActivateTimesOnTargets);
+                    combat.AllDamageRecoveryTimes[healer] = reactionTimesToBigHigs;
+                    var reactionTimesToBigHigsOnTanks = CalculateReactionToBigHits(combat.BigDamageTimestamps.Where(kvp => tanks.Contains(kvp.Key)).ToDictionary(kvp => kvp.Key, kvp => kvp.Value), abilityActivateTimesOnTargets);
+                    combat.TankDamageRecoveryTimes[healer] = reactionTimesToBigHigsOnTanks;
+                }
+            }
+        }
+
         private static double GetSpeedFromLog(ParsedLogEntry cl, IEnumerable<ParsedLogEntry> effectRemoveLogs)
         {
             var removedEffectLog = effectRemoveLogs.FirstOrDefault(l => l.LogLineNumber > cl.LogLineNumber);
+            if (removedEffectLog == null) return 0;
             var cleanseTime = removedEffectLog.TimeStamp;
             var effectInQuestion = removedEffectLog.Effect.EffectId;
             var modifiersForCleansedEffect = CombatLogStateBuilder.CurrentState.Modifiers[effectInQuestion];
@@ -209,10 +483,10 @@ l.Effect.EffectType == EffectType.Remove && l.Target.LogId != l.Source.LogId && 
 
             return null;
         }
-        private static List<DateTime> GetTimestampOfBigHits(List<ParsedLogEntry> incomingDamage)
+        private static List<DateTime> GetTimestampOfBigHits(IEnumerable<ParsedLogEntry> incomingDamage)
         {
             var timestamps = new List<DateTime>();
-            if (incomingDamage.Count == 0)
+            if (!incomingDamage.Any())
                 return timestamps;
 
             var threshold = incomingDamage.First().TargetInfo.MaxHP * 0.05;
@@ -238,7 +512,7 @@ l.Effect.EffectType == EffectType.Remove && l.Target.LogId != l.Source.LogId && 
             }
             return timestamps;
         }
-        private static Dictionary<Entity, List<DateTime>> GetTimestampsOfAbilitiesOnPlayers(List<ParsedLogEntry> abilityActivateLogs)
+        private static Dictionary<Entity, List<DateTime>> GetTimestampsOfAbilitiesOnPlayers(IEnumerable<ParsedLogEntry> abilityActivateLogs)
         {
             var returnDict = new Dictionary<Entity, List<DateTime>>();
             foreach (var abilityActivation in abilityActivateLogs.Where(l => l.Target.IsCharacter))

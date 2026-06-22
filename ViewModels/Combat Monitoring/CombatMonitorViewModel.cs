@@ -380,7 +380,25 @@ namespace SWTORCombatParser.ViewModels.Combat_Monitoring
         {
             _totalLogsDuringCombat[combatStartTime] = obj;
             _usingHistoricalData = false;
-            var combatInfo = CombatIdentifier.GenerateNewCombatFromLogs(_totalLogsDuringCombat[combatStartTime].ToList(), true);
+
+            Combat combatInfo;
+            var currentCombatUI = CurrentEncounter?.EncounterCombats.FirstOrDefault(c => c.IsCurrentCombat);
+            if (currentCombatUI != null)
+            {
+                if (currentCombatUI.Combat == null)
+                {
+                    currentCombatUI.Combat = new Combat();
+                    CombatIdentifier.CurrentCombat = currentCombatUI.Combat;
+                }
+                combatInfo = currentCombatUI.Combat;
+                var newLogs = obj.Skip(combatInfo.AllLogs.Count).ToList();
+                CombatIdentifier.GenerateCombatFromLogs(newLogs, combatInfo, isRealtime: true, combatEndUpdate: false);
+            }
+            else
+            {
+                combatInfo = CombatIdentifier.GenerateCombatSnapshotFromLogs(obj, isRealtime: true, combatEndUpdate: false);
+            }
+
             CombatSelectionMonitor.InProgressCombatSeleted(combatInfo);
             if (CurrentEncounter == null)
                 return;
@@ -402,10 +420,21 @@ namespace SWTORCombatParser.ViewModels.Combat_Monitoring
             if (!_usingHistoricalData)
             {
                 Logging.LogInfo("Real time combat started at " + combatStartTime.ToString() + " has STOPPED");
+
+                Combat combatInfo;
+                var currentCombatUI = CurrentEncounter?.EncounterCombats.FirstOrDefault(c => c.IsCurrentCombat);
+                if (currentCombatUI != null && currentCombatUI.Combat != null)
+                {
+                    combatInfo = currentCombatUI.Combat;
+                    var newLogs = obj.Skip(combatInfo.AllLogs.Count).ToList();
+                    CombatIdentifier.GenerateCombatFromLogs(newLogs, combatInfo, isRealtime: true, combatEndUpdate: true);
+                }
+                else
+                {
+                    combatInfo = CombatIdentifier.GenerateCombatSnapshotFromLogs(obj, isRealtime: true, combatEndUpdate: true);
+                }
+
                 CurrentEncounter?.RemoveOngoing();
-                var combatInfo = CombatIdentifier.GenerateNewCombatFromLogs(obj, true, combatEndUpdate: true);
-                //if (combatInfo.IsCombatWithBoss)
-                //    Leaderboards.StartGetPlayerLeaderboardStandings(combatInfo);
                 CombatSelectionMonitor.SelectCompleteCombat(combatInfo);
                 if (_totalLogsDuringCombat.ContainsKey(combatStartTime))
                 {
@@ -431,7 +460,7 @@ namespace SWTORCombatParser.ViewModels.Combat_Monitoring
                 if (combatLogs.Count == 0)
                     continue;
                 Logging.LogInfo("Processing combat with start time " + combatStartTime + " and " + combatLogs.Count + " log entries");
-                var combatInfo = CombatIdentifier.GenerateNewCombatFromLogs(combatLogs, false, true, combatEndUpdate:true);
+                var combatInfo = CombatIdentifier.GenerateCombatSnapshotFromLogs(combatLogs, isRealtime: false, combatEndUpdate: true);
                 Logging.LogInfo("Combat processed!");
                 //LocalCombatLogCaching.SaveCombatLogs(combatInfo, false);
                 var addedNewEncounter = TryAddEncounter(combatInfo.StartTime);

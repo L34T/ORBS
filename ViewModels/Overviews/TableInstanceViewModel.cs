@@ -1,4 +1,4 @@
-﻿using SWTORCombatParser.DataStructures;
+using SWTORCombatParser.DataStructures;
 using SWTORCombatParser.DataStructures.ClassInfos;
 using SWTORCombatParser.Model.LogParsing;
 using SWTORCombatParser.Utilities;
@@ -196,7 +196,7 @@ namespace SWTORCombatParser.ViewModels.Overviews
         private async Task DisplayThreat(Combat combat, List<CombatInfoInstance> list)
         {
             var defaultEntity = combat.OutgoingDamageLogs.ContainsKey(_selectedEntity) ? _selectedEntity : combat.OutgoingDamageLogs.Keys.First();
-            Dictionary<string, List<ParsedLogEntry>> splitOutdata = GetDataSplitOut(combat, combat.LogsInvolvingEntity[defaultEntity].Where(l=>l.Source == defaultEntity && l.Threat != 0).ToList());
+            Dictionary<string, List<ParsedLogEntry>> splitOutdata = GetDataSplitOut(combat, combat.GetLogsInvolvingEntity(defaultEntity).Where(l=>l.Source == defaultEntity && l.Threat != 0).ToList());
             _sumTotal = splitOutdata.Sum(kvp => kvp.Value.Where(v=>v.Threat >=0).Sum(v => v.Threat));
             foreach (var orderedKey in splitOutdata)
             {
@@ -262,7 +262,7 @@ namespace SWTORCombatParser.ViewModels.Overviews
                 _ => (Color)ResourceFinder.GetColorFromResourceName("Gray4")
             };
         }
-        private Dictionary<string, List<ParsedLogEntry>> GetDataSplitOut(Combat combat, List<ParsedLogEntry> logsInScope)
+        private Dictionary<string, List<ParsedLogEntry>> GetDataSplitOut(Combat combat, IEnumerable<ParsedLogEntry> logsInScope)
         {
             Dictionary<string, List<ParsedLogEntry>> splitOutdata = new Dictionary<string, List<ParsedLogEntry>>();
             switch (SortingOption)

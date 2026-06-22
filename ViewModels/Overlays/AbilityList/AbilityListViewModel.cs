@@ -1,4 +1,4 @@
-﻿using SWTORCombatParser.DataStructures;
+using SWTORCombatParser.DataStructures;
 using SWTORCombatParser.DataStructures.ClassInfos;
 using SWTORCombatParser.Model.CloudRaiding;
 using SWTORCombatParser.Model.LogParsing;
@@ -87,8 +87,7 @@ manager => CombatSelectionMonitor.CombatSelected -= manager).Subscribe(UpdateLis
         {
             if (CombatLogStateBuilder.CurrentState.LocalPlayer == null)
                 return;
-            var abilities = new List<ParsedLogEntry>();
-            if(combat.AbilitiesActivated.TryGetValue(CombatLogStateBuilder.CurrentState.LocalPlayer, out abilities))
+            if (combat.AbilitiesActivated.TryGetValue(CombatLogStateBuilder.CurrentState.LocalPlayer, out var abilities))
             {
                 var abilitiesUsedlist = abilities.AsEnumerable().Reverse().ToList();
                 var newlyAddedAbilities = abilitiesUsedlist.Take((abilitiesUsedlist.Count - AbilityInfoList.Count));

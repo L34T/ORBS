@@ -1,4 +1,4 @@
-﻿using ScottPlot;
+using ScottPlot;
 using ScottPlot.Plottable;
 using SWTORCombatParser.DataStructures;
 using SWTORCombatParser.Model.CombatParsing;
@@ -444,22 +444,22 @@ namespace SWTORCombatParser.ViewModels.Home_View_Models
                 GraphView.Refresh();
             });
         }
-        private List<ParsedLogEntry> GetCorrectData(PlotType type, Combat combatToPlot, Entity selectedParticipant)
+        private IReadOnlyList<ParsedLogEntry> GetCorrectData(PlotType type, Combat combatToPlot, Entity selectedParticipant)
         {
             switch (type)
             {
                 case PlotType.DamageOutput:
-                    return combatToPlot.OutgoingDamageLogs.ContainsKey(selectedParticipant) ? combatToPlot.OutgoingDamageLogs[selectedParticipant] : new List<ParsedLogEntry>();
+                    return combatToPlot.OutgoingDamageLogs.TryGetValue(selectedParticipant, out var l1) ? l1 : new List<ParsedLogEntry>();
                 case PlotType.DamageTaken:
-                    return combatToPlot.IncomingDamageLogs.ContainsKey(selectedParticipant) ? combatToPlot.IncomingDamageLogs[selectedParticipant] : new List<ParsedLogEntry>();
+                    return combatToPlot.IncomingDamageLogs.TryGetValue(selectedParticipant, out var l2) ? l2 : new List<ParsedLogEntry>();
                 case PlotType.HealingOutput:
-                    return combatToPlot.OutgoingHealingLogs.ContainsKey(selectedParticipant) ? combatToPlot.OutgoingHealingLogs[selectedParticipant] : new List<ParsedLogEntry>();
+                    return combatToPlot.OutgoingHealingLogs.TryGetValue(selectedParticipant, out var l3) ? l3 : new List<ParsedLogEntry>();
                 case PlotType.HealingTaken:
-                    return combatToPlot.IncomingHealingLogs.ContainsKey(selectedParticipant) ? combatToPlot.IncomingHealingLogs[selectedParticipant] : new List<ParsedLogEntry>();
+                    return combatToPlot.IncomingHealingLogs.TryGetValue(selectedParticipant, out var l4) ? l4 : new List<ParsedLogEntry>();
                 case PlotType.SheildedDamageTaken:
-                    return combatToPlot.ShieldingProvidedLogs.ContainsKey(selectedParticipant) ? combatToPlot.ShieldingProvidedLogs[selectedParticipant] : new List<ParsedLogEntry>();
+                    return combatToPlot.ShieldingProvidedLogs.TryGetValue(selectedParticipant, out var l5) ? l5 : new List<ParsedLogEntry>();
                 case PlotType.HPPercent:
-                    return combatToPlot.GetLogsInvolvingEntity(selectedParticipant).ToList();
+                    return combatToPlot.GetLogsInvolvingEntity(selectedParticipant);
 
             }
             return null;

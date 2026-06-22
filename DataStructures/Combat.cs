@@ -81,48 +81,48 @@ namespace SWTORCombatParser.DataStructures
             }
         }
         public CombatLogsCollection AllLogs { get; set; } = new CombatLogsCollection();
-        public Dictionary<Entity, List<ParsedLogEntry>> LogsInvolvingEntity = new Dictionary<Entity, List<ParsedLogEntry>>();
+        public Dictionary<long, CombatLogsList<ParsedLogEntry>> LogsInvolvingEntity = new Dictionary<long, CombatLogsList<ParsedLogEntry>>();
 
-        public List<ParsedLogEntry> GetLogsInvolvingEntity(Entity e)
+        public CombatLogsList<ParsedLogEntry> GetLogsInvolvingEntity(Entity e)
         {
-            if (string.IsNullOrEmpty(e.Name) || !LogsInvolvingEntity.ContainsKey(e))
+            if (e == null || string.IsNullOrEmpty(e.Name) || !LogsInvolvingEntity.TryGetValue(e.LogId, out var logs))
             {
-                return new List<ParsedLogEntry>();
+                return new CombatLogsList<ParsedLogEntry>();
             }
 
-            return LogsInvolvingEntity[e];
+            return logs;
         }
         public bool WasPlayerKilled(Entity player)
         {
             return GetLogsInvolvingEntity(player).Any(l => l.Target == player && l.Effect.EffectId == _7_0LogParsing.DeathCombatId);
         }
-        public ConcurrentDictionary<Entity, List<ParsedLogEntry>> OutgoingDamageLogs = new ConcurrentDictionary<Entity, List<ParsedLogEntry>>();
-        public ConcurrentDictionary<Entity, List<ParsedLogEntry>> IncomingDamageLogs = new ConcurrentDictionary<Entity, List<ParsedLogEntry>>();
-        public ConcurrentDictionary<Entity, List<ParsedLogEntry>> IncomingDamageMitigatedLogs = new ConcurrentDictionary<Entity, List<ParsedLogEntry>>();
-        public ConcurrentDictionary<Entity, List<ParsedLogEntry>> OutgoingHealingLogs = new ConcurrentDictionary<Entity, List<ParsedLogEntry>>();
-        public ConcurrentDictionary<Entity, List<ParsedLogEntry>> IncomingHealingLogs = new ConcurrentDictionary<Entity, List<ParsedLogEntry>>();
-        public ConcurrentDictionary<Entity, List<ParsedLogEntry>> ShieldingProvidedLogs = new ConcurrentDictionary<Entity, List<ParsedLogEntry>>();
-        public ConcurrentDictionary<Entity, List<ParsedLogEntry>> AbilitiesActivated = new ConcurrentDictionary<Entity, List<ParsedLogEntry>>();
+        public ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>> OutgoingDamageLogs = new ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>>();
+        public ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>> IncomingDamageLogs = new ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>>();
+        public ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>> IncomingDamageMitigatedLogs = new ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>>();
+        public ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>> OutgoingHealingLogs = new ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>>();
+        public ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>> IncomingHealingLogs = new ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>>();
+        public ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>> ShieldingProvidedLogs = new ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>>();
+        public ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>> AbilitiesActivated = new ConcurrentDictionary<Entity, CombatLogsList<ParsedLogEntry>>();
         public ConcurrentDictionary<Entity, Dictionary<Entity, double>> PlayerThreatPerEnemy = new ConcurrentDictionary<Entity, Dictionary<Entity, double>>();
         public List<Point> GetBurstValues(Entity entity, PlotType typeOfData)
         {
-            var logs = new List<ParsedLogEntry>();
+            IEnumerable<ParsedLogEntry> logs = new List<ParsedLogEntry>();
             switch (typeOfData)
             {
                 case PlotType.DamageOutput:
-                    logs = OutgoingDamageLogs[entity];
+                    if (OutgoingDamageLogs.TryGetValue(entity, out var l1)) logs = l1;
                     break;
                 case PlotType.HealingOutput:
-                    logs = OutgoingHealingLogs[entity];
+                    if (OutgoingHealingLogs.TryGetValue(entity, out var l2)) logs = l2;
                     break;
                 case PlotType.DamageTaken:
-                    logs = IncomingDamageLogs[entity];
+                    if (IncomingDamageLogs.TryGetValue(entity, out var l3)) logs = l3;
                     break;
                 case PlotType.HealingTaken:
-                    logs = IncomingHealingLogs[entity];
+                    if (IncomingHealingLogs.TryGetValue(entity, out var l4)) logs = l4;
                     break;
             }
-            if (logs.Count == 0)
+            if (!logs.Any())
                 return new List<Point>();
             var timeStamps = PlotMaker.GetPlotXVals(logs, StartTime);
             var values = logs.Select(l => l.Value.EffectiveDblValue);
@@ -165,7 +165,7 @@ namespace SWTORCombatParser.DataStructures
         }
         public double GetDamageIncomingByAbilityForPlayer(string ability, Entity player)
         {
-            return IncomingDamageLogs[player].Where(l => l.Ability == ability || l.AbilityId == ability).Sum(l => l.Value.EffectiveDblValue);
+            return IncomingDamageLogs.TryGetValue(player, out var logs) ? logs.Where(l => l.Ability == ability || l.AbilityId == ability).Sum(l => l.Value.EffectiveDblValue) : 0;
         }
         public double GetDamageToEntityByAbilityForPlayer(string ability, string entity, Entity player)
         {
@@ -192,7 +192,7 @@ namespace SWTORCombatParser.DataStructures
         }
         public double GetDamageOutgoingByAbilityForPlayer(string ability, Entity player)
         {
-            return OutgoingDamageLogs[player].Where(l => l.Ability == ability || l.AbilityId == ability).Sum(l => l.Value.EffectiveDblValue);
+            return OutgoingDamageLogs.TryGetValue(player, out var logs) ? logs.Where(l => l.Ability == ability || l.AbilityId == ability).Sum(l => l.Value.EffectiveDblValue) : 0;
         }
         public double GetDamageToEntityByPlayer(string entity, Entity player)
         {
@@ -227,41 +227,41 @@ namespace SWTORCombatParser.DataStructures
         }
         public Dictionary<Entity, List<ParsedLogEntry>> GetOutgoingDamageByTarget(Entity source)
         {
-            return GetByTarget(OutgoingDamageLogs[source]);
+            return OutgoingDamageLogs.TryGetValue(source, out var logs) ? GetByTarget(logs) : new Dictionary<Entity, List<ParsedLogEntry>>();
         }
         public Dictionary<Entity, List<ParsedLogEntry>> GetIncomingDamageBySource(Entity source)
         {
-            return GetBySource(IncomingDamageLogs[source]);
+            return IncomingDamageLogs.TryGetValue(source, out var logs) ? GetBySource(logs) : new Dictionary<Entity, List<ParsedLogEntry>>();
         }
         public Dictionary<string, List<ParsedLogEntry>> GetOutgoingDamageByAbility(Entity source)
         {
-            return GetByAbility(OutgoingDamageLogs[source]);
+            return OutgoingDamageLogs.TryGetValue(source, out var logs) ? GetByAbility(logs) : new Dictionary<string, List<ParsedLogEntry>>();
         }
         public Dictionary<string, List<ParsedLogEntry>> GetIncomingDamageByAbility(Entity source)
         {
-            return GetByAbility(IncomingDamageLogs[source]);
+            return IncomingDamageLogs.TryGetValue(source, out var logs) ? GetByAbility(logs) : new Dictionary<string, List<ParsedLogEntry>>();
         }
         public Dictionary<Entity, List<ParsedLogEntry>> GetIncomingHealingBySource(Entity source)
         {
-            return GetBySource(IncomingHealingLogs[source]);
+            return IncomingHealingLogs.TryGetValue(source, out var logs) ? GetBySource(logs) : new Dictionary<Entity, List<ParsedLogEntry>>();
         }
         public Dictionary<string, List<ParsedLogEntry>> GetIncomingHealingByAbility(Entity source)
         {
-            return GetByAbility(IncomingHealingLogs[source]);
+            return IncomingHealingLogs.TryGetValue(source, out var logs) ? GetByAbility(logs) : new Dictionary<string, List<ParsedLogEntry>>();
         }
         public Dictionary<Entity, List<ParsedLogEntry>> GetOutgoingHealingByTarget(Entity source)
         {
-            return GetByTarget(OutgoingHealingLogs[source]);
+            return OutgoingHealingLogs.TryGetValue(source, out var logs) ? GetByTarget(logs) : new Dictionary<Entity, List<ParsedLogEntry>>();
         }
         public Dictionary<string, List<ParsedLogEntry>> GetOutgoingHealingByAbility(Entity source)
         {
-            return GetByAbility(OutgoingHealingLogs[source]);
+            return OutgoingHealingLogs.TryGetValue(source, out var logs) ? GetByAbility(logs) : new Dictionary<string, List<ParsedLogEntry>>();
         }
         public Dictionary<Entity, List<ParsedLogEntry>> GetShieldingBySource(Entity source)
         {
-            return GetBySource(IncomingDamageMitigatedLogs[source]);
+            return IncomingDamageMitigatedLogs.TryGetValue(source, out var logs) ? GetBySource(logs) : new Dictionary<Entity, List<ParsedLogEntry>>();
         }
-        public Dictionary<Entity, List<ParsedLogEntry>> GetByTarget(List<ParsedLogEntry> logsToCheck)
+        public Dictionary<Entity, List<ParsedLogEntry>> GetByTarget(IEnumerable<ParsedLogEntry> logsToCheck)
         {
             var returnDict = new Dictionary<Entity, List<ParsedLogEntry>>();
             var distinctTargets = logsToCheck.Select(l => l.Target).Where(v => v.Name != null).DistinctBy(e => e.LogId);
@@ -271,7 +271,7 @@ namespace SWTORCombatParser.DataStructures
             }
             return returnDict;
         }
-        public Dictionary<Entity, List<ParsedLogEntry>> GetBySource(List<ParsedLogEntry> logsToCheck)
+        public Dictionary<Entity, List<ParsedLogEntry>> GetBySource(IEnumerable<ParsedLogEntry> logsToCheck)
         {
             var returnDict = new Dictionary<Entity, List<ParsedLogEntry>>();
             var distinctSources = logsToCheck.Select(l => l.Source).Where(v => v.Name != null).DistinctBy(e => e.LogId);
@@ -281,7 +281,7 @@ namespace SWTORCombatParser.DataStructures
             }
             return returnDict;
         }
-        public Dictionary<Entity, List<ParsedLogEntry>> GetByTargetName(List<ParsedLogEntry> logsToCheck)
+        public Dictionary<Entity, List<ParsedLogEntry>> GetByTargetName(IEnumerable<ParsedLogEntry> logsToCheck)
         {
             var returnDict = new Dictionary<Entity, List<ParsedLogEntry>>();
             var distinctTargets = logsToCheck.Select(l => l.Target).Where(v => v.Name != null).DistinctBy(e => e.Name);
@@ -291,7 +291,7 @@ namespace SWTORCombatParser.DataStructures
             }
             return returnDict;
         }
-        public Dictionary<Entity, List<ParsedLogEntry>> GetBySourceName(List<ParsedLogEntry> logsToCheck)
+        public Dictionary<Entity, List<ParsedLogEntry>> GetBySourceName(IEnumerable<ParsedLogEntry> logsToCheck)
         {
             var returnDict = new Dictionary<Entity, List<ParsedLogEntry>>();
             var distinctSources = logsToCheck.Select(l => l.Source).Where(v => v.Name != null).DistinctBy(e => e.Name);
@@ -301,7 +301,7 @@ namespace SWTORCombatParser.DataStructures
             }
             return returnDict;
         }
-        public Dictionary<string, List<ParsedLogEntry>> GetByAbility(List<ParsedLogEntry> logsToCheck)
+        public Dictionary<string, List<ParsedLogEntry>> GetByAbility(IEnumerable<ParsedLogEntry> logsToCheck)
         {
             var returnDict = new Dictionary<string, List<ParsedLogEntry>>();
             var distinctAbilities = logsToCheck.Select(l => l.Ability).Distinct();
@@ -588,11 +588,93 @@ namespace SWTORCombatParser.DataStructures
                 return new Combat();
             var duration = phases.Sum(p => ((p.PhaseEnd == DateTime.MinValue ? CombatIdentifier.CurrentCombat.EndTime : p.PhaseEnd) - p.PhaseStart).TotalSeconds);
 
-            var phaseCombat = CombatIdentifier.GenerateNewCombatFromLogs(phaseLogs.ToList(), isPhaseCombat: true);
+            var phaseCombat = CombatIdentifier.GenerateCombatSnapshotFromLogs(phaseLogs.ToList(), combatEndUpdate: true);
             var tempDuration = duration * 1000;
             if (tempDuration < phaseCombat.DurationMS)
                 phaseCombat.DurationOverride = tempDuration;
             return phaseCombat;
+        }
+    }
+
+    public class CombatLogsList<T> : IReadOnlyList<T>
+    {
+        private readonly List<T> _innerList = new();
+        private readonly object _lock = new();
+
+        public CombatLogsList() {}
+
+        public CombatLogsList(IEnumerable<T> collection)
+        {
+            _innerList.AddRange(collection);
+        }
+
+        public int Count
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _innerList.Count;
+                }
+            }
+        }
+
+        public T this[int index]
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _innerList[index];
+                }
+            }
+        }
+
+        public void Add(T item)
+        {
+            lock (_lock)
+            {
+                _innerList.Add(item);
+            }
+        }
+
+        public void AddRange(IEnumerable<T> items)
+        {
+            lock (_lock)
+            {
+                _innerList.AddRange(items);
+            }
+        }
+
+        public void Clear()
+        {
+            lock (_lock)
+            {
+                _innerList.Clear();
+            }
+        }
+
+        public List<T> ToList()
+        {
+            lock (_lock)
+            {
+                return new List<T>(_innerList);
+            }
+        }
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            List<T> snapshot;
+            lock (_lock)
+            {
+                snapshot = new List<T>(_innerList);
+            }
+            return snapshot.GetEnumerator();
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
         }
     }
 

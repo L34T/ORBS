@@ -129,7 +129,7 @@ namespace SWTORCombatParser.Model.CombatParsing
                                      .ToList();
 
                 var idx = 0;
-                combat.ShieldingProvidedLogs[source] = new List<ParsedLogEntry>();
+                combat.ShieldingProvidedLogs[source] = new CombatLogsList<ParsedLogEntry>();
                 combat.TotalProvidedSheilding[source] = 0;
 
                 foreach (var ev in events)

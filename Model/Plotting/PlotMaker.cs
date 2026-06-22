@@ -1,4 +1,4 @@
-﻿using SWTORCombatParser.DataStructures;
+using SWTORCombatParser.DataStructures;
 using SWTORCombatParser.Model.LogParsing;
 using SWTORCombatParser.Utilities;
 using System;
@@ -10,23 +10,23 @@ namespace SWTORCombatParser.Model.Plotting
     public class PlotMaker
     {
 
-        public static double[] GetHPPercentages(List<ParsedLogEntry> logs, Entity sourcePlayer)
+        public static double[] GetHPPercentages(IEnumerable<ParsedLogEntry> logs, Entity sourcePlayer)
         {
             return logs.Where(l => l.Target == sourcePlayer && l.Effect.EffectType != EffectType.AbsorbShield).Select(l => (l.TargetInfo.CurrentHP / l.TargetInfo.MaxHP)).ToArray();
         }
-        internal static double[] GetPlotHPXVals(List<ParsedLogEntry> totalLogsDuringCombat, DateTime startPoint, Entity sourcePlayer)
+        internal static double[] GetPlotHPXVals(IEnumerable<ParsedLogEntry> totalLogsDuringCombat, DateTime startPoint, Entity sourcePlayer)
         {
             var startTime = startPoint;
             var logsToUse = totalLogsDuringCombat.Where(l => l.Target == sourcePlayer && l.Effect.EffectType != EffectType.AbsorbShield);
             return logsToUse.Select(l => (l.TimeStamp - startTime).TotalSeconds).ToArray();
         }
-        internal static double[] GetPlotXVals(List<ParsedLogEntry> totalLogsDuringCombat, DateTime startPoint)
+        internal static double[] GetPlotXVals(IEnumerable<ParsedLogEntry> totalLogsDuringCombat, DateTime startPoint)
         {
             var startTime = startPoint;
             return totalLogsDuringCombat.Select(l => (l.TimeStamp - startTime).TotalSeconds).ToArray();
         }
 
-        internal static double[] GetPlotYVals(List<ParsedLogEntry> totalLogsDuringCombat, bool checkEffective)
+        internal static double[] GetPlotYVals(IEnumerable<ParsedLogEntry> totalLogsDuringCombat, bool checkEffective)
         {
             if (!checkEffective)
                 return totalLogsDuringCombat.Select(l => l.Value.DblValue).ToArray();
@@ -80,7 +80,7 @@ namespace SWTORCombatParser.Model.Plotting
             return zcores;
         }
 
-        internal static List<(string, string)> GetAnnotationString(List<ParsedLogEntry> data, bool isIncoming, bool isShield = false)
+        internal static List<(string, string)> GetAnnotationString(IEnumerable<ParsedLogEntry> data, bool isIncoming, bool isShield = false)
         {
             return data.Select(d => GetAnnotationForAbilitiy(d, isIncoming, isShield)).ToList();
         }
